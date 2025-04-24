@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PublicFinance.lk Assistant</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        :root {
+            --brand-color: #4b2aad;
+            --bg-light: #eef1f5;
+            --text-light: #333;
+            --bot-bg: #f4f4f7;
+            --user-bg: #d7f0ed;
+            --card-bg: #f9f9fa;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: var(--bg-light);
+            color: var(--text-light);
+        }
+
+        .chat-wrapper {
+            display: flex;
+            flex-direction: column;
+            max-width: 700px;
+            height: 90vh;
+            margin: 30px auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background: var(--brand-color);
+            color: white;
+            padding: 20px;
+            font-size: 1.3rem;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .chat-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 14px 18px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+        .user {
+            align-self: flex-end;
+            background: var(--user-bg);
+            border-bottom-right-radius: 0;
+        }
+
+        .bot {
+            align-self: flex-start;
+            background: var(--bot-bg);
+            border-bottom-left-radius: 0;
+        }
+
+        .source-card {
+            background: var(--card-bg);
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 10px;
+        }
+
+        .source-card a {
+            color: var(--brand-color);
+            text-decoration: none;
+        }
+
+        .source-card a:hover {
+            text-decoration: underline;
+        }
+
+        form {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            border-top: 1px solid #eee;
+            background: #fafafa;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 12px;
+            font-size: 15px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            margin-right: 10px;
+        }
+
+        input[type="submit"] {
+            background: var(--brand-color);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        input[type="submit"]:hover {
+            background: #3a2291;
+        }
+
+        .mic-button {
+            background: transparent;
+            border: none;
+            font-size: 22px;
+            margin-right: 10px;
+            cursor: pointer;
+            color: var(--brand-color);
+            transition: transform 0.2s;
+        }
+
+        .mic-button.active {
+            color: red;
+            transform: scale(1.2);
+        }
+
+        .loader {
+            width: 20px;
+            height: 20px;
+            border: 3px solid #ccc;
+            border-top: 3px solid var(--brand-color);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-left: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .chat-wrapper {
+                margin: 10px;
+                height: 95vh;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="chat-wrapper">
+    <div class="chat-header">PublicFinance.lk Assistant</div>
+    <div class="chat-body" id="chat-body"></div>
+
+    <form id="chat-form">
+        <input type="text" name="question" id="question-input" placeholder="Type your message here..." required>
+        <button type="button" class="mic-button" id="mic-button" title="Click to speak">🎤</button>
+        <input type="submit" value="Send">
+    </form>
+</div>
+
+<script>
+    const micButton = document.getElementById('mic-button');
+    const questionInput = document.getElementById('question-input');
+    const chatForm = document.getElementById('chat-form');
+    const chatBody = document.getElementById('chat-body');
+
+    function appendMessage(content, className) {
+        const msg = document.createElement("div");
+        msg.className = `message ${className}`;
+        msg.innerHTML = content;
+        chatBody.appendChild(msg);
+        chatBody.scrollTop = chatBody.scrollHeight;
+    }
+
+    function appendBotResponse(answer, urls = []) {
+        let content = answer;
+        if (urls.length > 0) {
+            content += `<div class="source-card"><strong>Sources:</strong><ul>`;
+            urls.forEach(url => {
+                content += `<li><a href="${url}" target="_blank">${url}</a></li>`;
+            });
+            content += `</ul></div>`;
+        }
+        appendMessage(content, 'bot');
+    }
+
+    chatForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const question = questionInput.value.trim();
+        if (!question) return;
+
+        appendMessage(question, 'user');
+        questionInput.value = "";
+
+        const loader = document.createElement("div");
+        loader.className = "message bot";
+        loader.innerHTML = `<span>Thinking...</span> <div class="loader"></div>`;
+        chatBody.appendChild(loader);
+        chatBody.scrollTop = chatBody.scrollHeight;
+
+        try {
+            const response = await fetch("/ask", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ question })
+            });
+
+            const data = await response.json();
+            chatBody.removeChild(loader);
+            appendBotResponse(data.answer, data.urls);
+        } catch (err) {
+            chatBody.removeChild(loader);
+            appendBotResponse("Something went wrong. Please try again.");
+        }
+    });
+
+    // Speech Recognition
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition;
+    let isListening = false;
+
+    if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = 'en-GB';
+
+        micButton.addEventListener('click', () => {
+            if (!isListening) {
+                recognition.start();
+                isListening = true;
+                micButton.classList.add("active");
+                micButton.innerText = "🔴";
+                micButton.title = "Click to stop";
+            } else {
+                recognition.stop();
+                isListening = false;
+                micButton.classList.remove("active");
+                micButton.innerText = "🎤";
+                micButton.title = "Click to speak";
+            }
+        });
+
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            questionInput.value = transcript;
+        };
+
+        recognition.onend = () => {
+            isListening = false;
+            micButton.classList.remove("active");
+            micButton.innerText = "🎤";
+            micButton.title = "Click to speak";
+        };
+
+        recognition.onerror = (event) => {
+            alert("Speech recognition error: " + event.error);
+            isListening = false;
+            micButton.classList.remove("active");
+            micButton.innerText = "🎤";
+            micButton.title = "Click to speak";
+        };
+    } else {
+        micButton.disabled = true;
+        micButton.title = "Speech recognition not supported";
+    }
+</script>
+</body>
+</html>
